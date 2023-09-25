@@ -11,7 +11,6 @@ class AppDatabase {
       username: username,
       email: email,
       password: password,
-      posts: [],
     };
 
     const users = await AsyncStorage.getItem("users");
@@ -34,7 +33,6 @@ class AppDatabase {
         );
       }
     }
-    console.log(JSON.parse(await AsyncStorage.getItem("users")));
   }
 
   async signIn(username, password) {
@@ -56,9 +54,8 @@ class AppDatabase {
               username: candidate.username,
               email: candidate.email,
               userID: candidate.userID,
-              posts: candidate.posts,
-              duration: 10,
-              start: new Date()
+              duration: 60,
+              start: new Date(),
             },
             "secret"
           );

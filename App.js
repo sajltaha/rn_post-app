@@ -1,8 +1,10 @@
 import * as React from "react";
-import { NavigationContainer, useFocusEffect } from "@react-navigation/native";
+import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import uuid from "react-native-uuid";
 import {
   Button,
+  FlatList,
   StyleSheet,
   Text,
   TextInput,
@@ -10,9 +12,11 @@ import {
   View,
 } from "react-native";
 import AppDatabase from "./components/AppDatabase";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import jwt_decode from "jwt-decode";
+
+// AsyncStorage.clear()
 
 const appDatabase = AppDatabase;
 
@@ -107,12 +111,14 @@ const SignInPage = ({ navigation }) => {
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const onPressSignIn = async (navigation) => {
+  const { setIsAuth } = useContext(ParentContext);
+
+  const onPressSignIn = async () => {
     try {
       await appDatabase.signIn(username, password);
       setPassword("");
       setUsername("");
-      navigation.navigate(pages.postP);
+      setIsAuth(true);
     } catch (error) {
       setUsername("");
       setPassword("");
@@ -148,7 +154,7 @@ const SignInPage = ({ navigation }) => {
         <Button
           title="Sign In"
           disabled={!username || !password}
-          onPress={() => onPressSignIn(navigation)}
+          onPress={() => onPressSignIn()}
         />
         {hasError && (
           <View style={{ marginTop: 15 }}>
@@ -161,44 +167,136 @@ const SignInPage = ({ navigation }) => {
 };
 
 const PostPage = () => {
+  const [posts, setPosts] = useState([]);
+  const { currentUser, setIsAuth } = useContext(ParentContext);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      const posts = await AsyncStorage.getItem("posts");
+      const postsConverted = JSON.parse(posts);
+      if (postsConverted) {
+        setPosts(postsConverted);
+      }
+    })();
+  }, []);
+
+  const onPress = async () => {
+    const post = {
+      postID: uuid.v4(),
+      username: currentUser.username,
+      title: title,
+      description: description,
+    };
+
+    await AsyncStorage.setItem("posts", JSON.stringify([...posts, post]));
+    setPosts([...posts, post]);
+  };
+
   return (
-    <View>
-      <Text>asd</Text>
+    <View style={{ padding: 15 }}>
+      <FlatList
+        data={posts}
+        keyExtractor={(post) => post.postID}
+        renderItem={({ item }) => {
+          return (
+            <View key={item.postID}>
+              <Text>{item.title}</Text>
+              <Text>{item.description}</Text>
+              <Text>created by {item.username}</Text>
+            </View>
+          );
+        }}
+      />
+      <View>
+        <TextInput
+          placeholder="Title"
+          style={{ borderWidth: 1 }}
+          value={title}
+          onChangeText={(text) => setTitle(text)}
+        />
+        <TextInput
+          placeholder="Description"
+          style={{ borderWidth: 1 }}
+          value={description}
+          onChangeText={(text) => setDescription(text)}
+        />
+        <Button title="add" onPress={onPress} />
+        <Button
+          title="sign out"
+          onPress={async () => {
+            await AsyncStorage.removeItem("token");
+            setIsAuth(false);
+          }}
+        />
+      </View>
     </View>
   );
 };
 
+const ParentContext = React.createContext({});
+
 export default function App() {
+  const [isAuth, setIsAuth] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [currentUser, setCurrentUser] = useState("");
+
   useEffect(() => {
     (async () => {
       const token = await AsyncStorage.getItem("token");
       if (token) {
         const convertedToken = jwt_decode(token);
+        setCurrentUser(convertedToken);
         const duration = convertedToken.duration;
         const start = convertedToken.start;
-        const gap = (new Date(start) - new Date()) / 1000;
-        if (gap >= duration) {
-          console.log(false);
-        } else {
-          console.log(true);
+        const gap = (new Date() - new Date(start)) / 1000;
+        if (gap <= duration) {
+          setTimeout(() => {
+            setIsAuth(false);
+          }, (duration - gap) * 1000);
+          setIsAuth(true);
         }
       }
+      setLoaded(true);
     })();
-  }, []);
+  }, [isAuth]);
 
+  if (!loaded) {
+    return null;
+  }
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName={pages.signUpP}
-        screenOptions={{
-          headerBackVisible: false,
-        }}
-      >
-        <Stack.Screen name={pages.signUpP} component={SignUpPage} />
-        <Stack.Screen name={pages.signInP} component={SignInPage} />
-        <Stack.Screen name={pages.postP} component={PostPage} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <ParentContext.Provider value={{ setIsAuth, currentUser }}>
+      <NavigationContainer>
+        <Stack.Navigator
+          screenOptions={{
+            headerBackVisible: false,
+          }}
+        >
+          {!isAuth && (
+            <>
+              <Stack.Screen
+                name={pages.signUpP}
+                component={SignUpPage}
+                options={{ title: `Sign Up` }}
+              />
+              <Stack.Screen
+                name={pages.signInP}
+                component={SignInPage}
+                options={{ title: `Sign In` }}
+              />
+            </>
+          )}
+          {isAuth && (
+            <Stack.Screen
+              name={pages.postP}
+              component={PostPage}
+              options={{ title: `Posts` }}
+            />
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </ParentContext.Provider>
   );
 }
 
