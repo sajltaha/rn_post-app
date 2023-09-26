@@ -5,16 +5,20 @@ import uuid from "react-native-uuid";
 import {
   Button,
   FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  Image,
+  Modal,
 } from "react-native";
 import AppDatabase from "./components/AppDatabase";
 import { useState, useEffect, useContext } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import jwt_decode from "jwt-decode";
+import Svg, { Path } from "react-native-svg";
 
 // AsyncStorage.clear()
 
@@ -171,6 +175,7 @@ const PostPage = () => {
   const { currentUser, setIsAuth } = useContext(ParentContext);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -182,7 +187,7 @@ const PostPage = () => {
     })();
   }, []);
 
-  const onPress = async () => {
+  const onPressAddPost = async () => {
     const post = {
       postID: uuid.v4(),
       username: currentUser.username,
@@ -192,6 +197,10 @@ const PostPage = () => {
 
     await AsyncStorage.setItem("posts", JSON.stringify([...posts, post]));
     setPosts([...posts, post]);
+
+    setTitle("");
+    setDescription("");
+    setModalVisible(false);
   };
 
   return (
@@ -201,7 +210,17 @@ const PostPage = () => {
         keyExtractor={(post) => post.postID}
         renderItem={({ item }) => {
           return (
-            <View key={item.postID}>
+            <View
+              key={item.postID}
+              style={{
+                backgroundColor: "wheat",
+                marginBottom: 15,
+                padding: 10,
+                borderWidth: 1,
+                borderRadius: 15,
+                elevation: 5,
+              }}
+            >
               <Text>{item.title}</Text>
               <Text>{item.description}</Text>
               <Text>created by {item.username}</Text>
@@ -209,28 +228,90 @@ const PostPage = () => {
           );
         }}
       />
-      <View>
-        <TextInput
-          placeholder="Title"
-          style={{ borderWidth: 1 }}
-          value={title}
-          onChangeText={(text) => setTitle(text)}
-        />
-        <TextInput
-          placeholder="Description"
-          style={{ borderWidth: 1 }}
-          value={description}
-          onChangeText={(text) => setDescription(text)}
-        />
-        <Button title="add" onPress={onPress} />
-        <Button
-          title="sign out"
-          onPress={async () => {
-            await AsyncStorage.removeItem("token");
-            setIsAuth(false);
+      <Modal animationType="fade" visible={modalVisible}>
+        <View
+          style={{
+            backgroundColor: "#9EDDFF",
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
           }}
-        />
-      </View>
+        >
+          <TextInput
+            placeholder="Title"
+            style={{
+              borderWidth: 2,
+              backgroundColor: "#fff",
+              width: 200,
+              padding: 10,
+              borderRadius: 15,
+              marginBottom: 15,
+            }}
+            value={title}
+            onChangeText={(text) => setTitle(text)}
+          />
+          <TextInput
+            placeholder="Description"
+            style={{
+              borderWidth: 2,
+              backgroundColor: "#fff",
+              width: 200,
+              padding: 10,
+              borderRadius: 15,
+              marginBottom: 15,
+            }}
+            value={description}
+            onChangeText={(text) => setDescription(text)}
+          />
+          <View style={{ width: 90, marginBottom: 15 }}>
+            <Button
+              disabled={!title || !description}
+              title="add"
+              onPress={onPressAddPost}
+            />
+          </View>
+          <View style={{ width: 90 }}>
+            <Button title="close" onPress={() => setModalVisible(false)} />
+          </View>
+        </View>
+      </Modal>
+      <TouchableOpacity
+        onPress={() => setModalVisible(true)}
+        style={{
+          position: "absolute",
+          top: "90%",
+          left: "80%",
+        }}
+      >
+        <Svg
+          xmlns="http://www.w3.org/2000/svg"
+          height="70"
+          viewBox="0 -960 960 960"
+          width="70"
+        >
+          <Path d="M440-280h80v-160h160v-80H520v-160h-80v160H280v80h160v160Zm40 200q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z" />
+        </Svg>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={async () => {
+          await AsyncStorage.removeItem("token");
+          setIsAuth(false);
+        }}
+        style={{
+          position: "absolute",
+          top: "90%",
+          left: "10%",
+        }}
+      >
+        <Svg
+          xmlns="http://www.w3.org/2000/svg"
+          height="70"
+          viewBox="0 -960 960 960"
+          width="70"
+        >
+          <Path d="M806-440H320v-80h486l-62-62 56-58 160 160-160 160-56-58 62-62ZM600-600v-160H200v560h400v-160h80v160q0 33-23.5 56.5T600-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h400q33 0 56.5 23.5T680-760v160h-80Z" />
+        </Svg>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -276,14 +357,14 @@ export default function App() {
           {!isAuth && (
             <>
               <Stack.Screen
-                name={pages.signUpP}
-                component={SignUpPage}
-                options={{ title: `Sign Up` }}
-              />
-              <Stack.Screen
                 name={pages.signInP}
                 component={SignInPage}
                 options={{ title: `Sign In` }}
+              />
+              <Stack.Screen
+                name={pages.signUpP}
+                component={SignUpPage}
+                options={{ title: `Sign Up` }}
               />
             </>
           )}

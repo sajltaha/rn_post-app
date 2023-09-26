@@ -54,7 +54,7 @@ class AppDatabase {
               username: candidate.username,
               email: candidate.email,
               userID: candidate.userID,
-              duration: 60,
+              duration: 600,
               start: new Date(),
             },
             "secret"
