@@ -1,5 +1,5 @@
 import * as React from "react";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, useRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import uuid from "react-native-uuid";
 import {
@@ -26,10 +26,13 @@ const appDatabase = AppDatabase;
 
 const Stack = createNativeStackNavigator();
 
+const ParentContext = React.createContext({});
+
 const pages = {
   signUpP: "Sign Up",
   signInP: "Sign In",
-  postP: "Posts Page",
+  postP: "Posts",
+  postInP: "Post In",
 };
 
 const SignUpPage = ({ navigation }) => {
@@ -170,7 +173,7 @@ const SignInPage = ({ navigation }) => {
   );
 };
 
-const PostPage = () => {
+const PostPage = ({ navigation }) => {
   const [posts, setPosts] = useState([]);
   const { currentUser, setIsAuth } = useContext(ParentContext);
   const [title, setTitle] = useState("");
@@ -178,14 +181,24 @@ const PostPage = () => {
   const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const posts = await AsyncStorage.getItem("posts");
-      const postsConverted = JSON.parse(posts);
-      if (postsConverted) {
-        setPosts(postsConverted);
-      }
-    })();
+    navigation.addListener("focus", () => {
+      (async () => {
+        const posts = await AsyncStorage.getItem("posts");
+        const postsConverted = JSON.parse(posts);
+        if (postsConverted) {
+          setPosts(postsConverted);
+        }
+      })();
+    });
+
+    navigation.addListener("blur", () => {
+      setPosts([]);
+    });
   }, []);
+
+  const openPost = (info) => {
+    navigation.navigate(pages.postInP, { info: info });
+  };
 
   const onPressAddPost = async () => {
     const post = {
@@ -204,27 +217,41 @@ const PostPage = () => {
   };
 
   return (
-    <View style={{ padding: 15 }}>
+    <View style={{ padding: 15, flex: 1 }}>
       <FlatList
         data={posts}
         keyExtractor={(post) => post.postID}
         renderItem={({ item }) => {
           return (
-            <View
+            <TouchableOpacity
               key={item.postID}
+              onPress={() => openPost(item)}
               style={{
                 backgroundColor: "wheat",
                 marginBottom: 15,
-                padding: 10,
+                paddingVertical: 10,
+                paddingHorizontal: 40,
                 borderWidth: 1,
                 borderRadius: 15,
                 elevation: 5,
               }}
             >
-              <Text>{item.title}</Text>
-              <Text>{item.description}</Text>
-              <Text>created by {item.username}</Text>
-            </View>
+              <View>
+                <Text
+                  style={{
+                    textAlign: "center",
+                    fontSize: 18,
+                    color: "brown",
+                    fontWeight: 600,
+                  }}
+                >
+                  {item.title}
+                </Text>
+                <Text style={{ textAlign: "center", paddingTop: 15 }}>
+                  {item.description}
+                </Text>
+              </View>
+            </TouchableOpacity>
           );
         }}
       />
@@ -271,7 +298,14 @@ const PostPage = () => {
             />
           </View>
           <View style={{ width: 90 }}>
-            <Button title="close" onPress={() => setModalVisible(false)} />
+            <Button
+              title="close"
+              onPress={() => {
+                setModalVisible(false);
+                setTitle("");
+                setDescription("");
+              }}
+            />
           </View>
         </View>
       </Modal>
@@ -279,8 +313,8 @@ const PostPage = () => {
         onPress={() => setModalVisible(true)}
         style={{
           position: "absolute",
-          top: "90%",
-          left: "80%",
+          right: 40,
+          bottom: 40,
         }}
       >
         <Svg
@@ -299,8 +333,8 @@ const PostPage = () => {
         }}
         style={{
           position: "absolute",
-          top: "90%",
-          left: "10%",
+          left: 40,
+          bottom: 40,
         }}
       >
         <Svg
@@ -316,7 +350,82 @@ const PostPage = () => {
   );
 };
 
-const ParentContext = React.createContext({});
+const PostInPage = ({ navigation }) => {
+  const [postInfo, setPostInfo] = useState("");
+  const { params } = useRoute();
+
+  useEffect(() => {
+    if (params) {
+      setPostInfo(params.info);
+    } else {
+      setPostInfo(params);
+    }
+  }, [params]);
+
+  const deletePost = async () => {
+    const posts = await AsyncStorage.getItem("posts");
+    const postsParsed = JSON.parse(posts);
+    const remainedPosts = postsParsed.filter((post) => {
+      if (post.postID !== postInfo.postID) {
+        return post;
+      }
+    });
+    await AsyncStorage.setItem("posts", JSON.stringify(remainedPosts));
+    navigation.navigate(pages.postP);
+  };
+
+  return (
+    <View style={{ padding: 15 }}>
+      <View
+        style={{
+          backgroundColor: "wheat",
+          marginBottom: 15,
+          paddingVertical: 10,
+          paddingHorizontal: 40,
+          borderWidth: 1,
+          borderRadius: 15,
+          elevation: 5,
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            textAlign: "center",
+            fontSize: 18,
+            color: "brown",
+            fontWeight: 600,
+          }}
+        >
+          {postInfo.title}
+        </Text>
+        <Text style={{ textAlign: "center", paddingTop: 15 }}>
+          {postInfo.description}
+        </Text>
+        <Text style={{ textAlign: "center", paddingTop: 15, fontWeight: 600 }}>
+          Created by {postInfo.username}
+        </Text>
+        <TouchableOpacity onPress={deletePost} style={{ marginTop: 15 }}>
+          <Svg
+            xmlns="http://www.w3.org/2000/svg"
+            height="70"
+            viewBox="0 -960 960 960"
+            width="70"
+          >
+            <Path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
+          </Svg>
+        </TouchableOpacity>
+        <View style={{ width: 90, marginTop: 15 }}>
+          <Button
+            title="Go Back"
+            onPress={() => {
+              navigation.navigate(pages.postP);
+            }}
+          />
+        </View>
+      </View>
+    </View>
+  );
+};
 
 export default function App() {
   const [isAuth, setIsAuth] = useState(false);
@@ -359,21 +468,28 @@ export default function App() {
               <Stack.Screen
                 name={pages.signInP}
                 component={SignInPage}
-                options={{ title: `Sign In` }}
+                options={{ title: pages.signInP }}
               />
               <Stack.Screen
                 name={pages.signUpP}
                 component={SignUpPage}
-                options={{ title: `Sign Up` }}
+                options={{ title: pages.signUpP }}
               />
             </>
           )}
           {isAuth && (
-            <Stack.Screen
-              name={pages.postP}
-              component={PostPage}
-              options={{ title: `Posts` }}
-            />
+            <>
+              <Stack.Screen
+                name={pages.postP}
+                component={PostPage}
+                options={{ title: pages.postP }}
+              />
+              <Stack.Screen
+                name={pages.postInP}
+                component={PostInPage}
+                options={{ title: pages.postInP }}
+              />
+            </>
           )}
         </Stack.Navigator>
       </NavigationContainer>
